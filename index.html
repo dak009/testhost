@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>이미지 예측</title>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
+</head>
+<body>
+  <h1>이미지 예측</h1>
+  <input type="file" id="imageInput" accept="image/*" />
+  <br />
+  <canvas id="canvas" width="224" height="224"></canvas>
+  <p id="result">예측 결과: </p>
+  
+  <script>
+    let model;
+const classNames = ["철쭉", "동백곷"];  // 너의 클래스 이름으로 수정!
+
+// 모델 불러오기
+async function loadModel() {
+  model = await tf.loadLayersModel('tfjs_model/model.json');
+  console.log("모델 불러옴");
+}
+loadModel();
+
+// 이미지 불러오기
+document.getElementById("imageInput").addEventListener("change", async (e) => {
+  const file = e.target.files[0];
+  const img = new Image();
+  img.src = URL.createObjectURL(file);
+
+  img.onload = async () => {
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+
+    ctx.drawImage(img, 0, 0, 224, 224);
+
+    // 이미지 데이터 가져오기 및 전처리
+    let imageData = ctx.getImageData(0, 0, 224, 224);
+    let tensor = tf.browser.fromPixels(imageData)
+                  .toFloat()
+                  .div(255.0)
+                  .expandDims();  // [1, 224, 224, 3]
+
+    // 예측
+    const prediction = await model.predict(tensor).data();
+    const predictedIndex = prediction.indexOf(Math.max(...prediction));
+    const resultText = `${classNames[predictedIndex]} (${(prediction[predictedIndex] * 100).toFixed(2)}%)`;
+
+    document.getElementById("result").innerText = "예측 결과: " + resultText;
+  };
+});
+
+async function loadModel() {
+  try {
+    model = await tf.loadLayersModel('tfjs_model/model.json');
+    console.log("✅ 모델 불러옴");
+  } catch (err) {
+    console.error("❌ 모델 로딩 실패:", err);
+  }
+}
+
+  </script>
+</body>
+</html>
