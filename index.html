@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>이미지 예측</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.10.0/dist/tf.min.js"></script>
+    <style>
+      .input_box {
+        border: 2px solid #333;
+        width: 500px;
+        padding: 10px;
+      }
+      .image-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 10px;
+      }
+      .image-prediction {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .image-prediction img {
+        width: 100px;
+        height: 100px;
+        object-fit: cover;
+      }
+    </style>
+  </head>
+<body>
+    <h1>이미지 예측</h1>
+    <div class="input_box">
+      <p>파일 업로드</p>
+      <input type="file" id="imageInput" accept="image/*" multiple />
+      <div id="resultContainer" class="image-container"></div>
+    </div>
+
+    <script>
+      let model;
+      const classNames = ["철쭉", "동백곷", "민들레", "장미"];
+
+      async function loadModel() {
+        try {
+          model = await tf.loadLayersModel('tfjs_model_1/model.json');
+          console.log("✅ 모델 불러옴");
+        } catch (err) {
+          console.error("❌ 모델 로딩 실패:", err);
+        }
+      }
+      loadModel();
+
+      document.getElementById("imageInput").addEventListener("change", async (e) => {
+        const files = Array.from(e.target.files);
+        const resultContainer = document.getElementById("resultContainer");
+        resultContainer.innerHTML = "";  // 이전 결과 제거
+
+        for (const file of files) {
+          const img = new Image();
+          img.src = URL.createObjectURL(file);
+
+          await new Promise((resolve) => {
+            img.onload = async () => {
+              // canvas로 변환
+              const canvas = document.createElement("canvas");
+              canvas.width = 224;
+              canvas.height = 224;
+              const ctx = canvas.getContext("2d");
+              ctx.drawImage(img, 0, 0, 224, 224);
+              const imageData = ctx.getImageData(0, 0, 224, 224);
+
+              // tensor 변환
+              const tensor = tf.browser.fromPixels(imageData)
+                              .toFloat()
+                              .div(255.0)
+                              .expandDims();
+
+              const prediction = await model.predict(tensor).data();
+              const predictedIndex = prediction.indexOf(Math.max(...prediction));
+              const resultText = `${classNames[predictedIndex]} (${(prediction[predictedIndex] * 100).toFixed(2)}%)`;
+
+              // 결과 DOM 생성
+              const wrapper = document.createElement("div");
+              wrapper.className = "image-prediction";
+              wrapper.innerHTML = `
+                <img src="${img.src}" />
+                <p>${resultText}</p>
+              `;
+              resultContainer.appendChild(wrapper);
+
+              resolve();
+            };
+          });
+        }
+      });
+    </script>
+  </body>
+</html>
